@@ -3,13 +3,14 @@ import type { Boxed, Y } from '@blocksuite/store';
 import { type Constructor, Slot } from '@blocksuite/global/utils';
 import { BlockModel, DocCollection, nanoid } from '@blocksuite/store';
 
+import { TreeManager } from '../tree.js';
 import { createDecoratorState } from './decorators/common.js';
 import { initializeObservers, initializeWatchers } from './decorators/index.js';
-import { syncElementFromY } from './element-model.js';
 import {
   type BaseElementProps,
   GfxGroupLikeElementModel,
   GfxPrimitiveElementModel,
+  syncElementFromY,
 } from './element-model.js';
 
 export type SurfaceBlockProps = {
@@ -55,6 +56,8 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
   protected _groupToElements = new Map<string, string[]>();
 
   protected _surfaceBlockModel = true;
+
+  protected _tree = new TreeManager(this);
 
   elementAdded = new Slot<{ id: string; local: boolean }>();
 
@@ -319,6 +322,11 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
     });
   }
 
+  private _initTreeWatcher() {
+    const disposable = this._tree.watch();
+    this.deleted.on(() => disposable.dispose());
+  }
+
   private _propsToY(type: string, props: Record<string, unknown>) {
     const ctor = this._elementCtorMap[type];
 
@@ -436,6 +444,7 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
 
   protected _init() {
     this._initElementModels();
+    this._initTreeWatcher();
     this._watchGroupRelationChange();
     this.applyMiddlewares();
   }
@@ -479,6 +488,10 @@ export class SurfaceBlockModel extends BlockModel<SurfaceBlockProps> {
 
     this.hooks.update.dispose();
     this.hooks.remove.dispose();
+  }
+
+  getContainer(elementId: string) {
+    return this._tree.getContainer(elementId);
   }
 
   getElementById(id: string): GfxPrimitiveElementModel | null {

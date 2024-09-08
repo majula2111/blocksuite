@@ -1,5 +1,6 @@
 import type {
   BaseElementProps,
+  GfxModel,
   SerializedElement,
   SurfaceBlockModel,
 } from '@blocksuite/block-std/gfx';
@@ -856,24 +857,24 @@ export class MindmapElementModel extends GfxGroupLikeElementModel<MindmapElement
     this.requestBuildTree();
   }
 
-  removeChild(id: string) {
-    if (!this._nodeMap.has(id)) {
+  removeChild(element: GfxModel) {
+    if (!this._nodeMap.has(element.id)) {
       return;
     }
 
     const surface = this.surface;
     const removedDescendants: string[] = [];
-    const remove = (element: MindmapNode) => {
-      element.children?.forEach(child => {
+    const remove = (node: MindmapNode) => {
+      node.children?.forEach(child => {
         remove(child);
       });
 
-      this.children?.delete(element.id);
-      removedDescendants.push(element.id);
+      this.children?.delete(node.id);
+      removedDescendants.push(node.id);
     };
 
     surface.doc.transact(() => {
-      remove(this._nodeMap.get(id)!);
+      remove(this._nodeMap.get(element.id)!);
     });
 
     queueMicrotask(() => {

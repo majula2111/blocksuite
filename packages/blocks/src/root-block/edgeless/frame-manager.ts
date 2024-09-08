@@ -7,7 +7,11 @@ import {
   renderableInEdgeless,
 } from '@blocksuite/affine-block-surface';
 import { GroupElementModel } from '@blocksuite/affine-model';
-import { isGfxContainerElm } from '@blocksuite/block-std/gfx';
+import {
+  getTopElements,
+  type GfxModel,
+  isGfxContainerElm,
+} from '@blocksuite/block-std/gfx';
 import { BlockSuiteError, ErrorCode } from '@blocksuite/global/exceptions';
 import {
   Bound,
@@ -22,7 +26,6 @@ import type { EdgelessRootService } from '../../index.js';
 import { GfxBlockModel } from './block-model.js';
 import { edgelessElementsBound } from './utils/bound-utils.js';
 import { isFrameBlock } from './utils/query.js';
-import { getTopElements } from './utils/tree.js';
 
 const MIN_FRAME_WIDTH = 800;
 const MIN_FRAME_HEIGHT = 640;
@@ -33,7 +36,7 @@ export class FrameOverlay extends Overlay {
 
   private _frame: FrameBlockModel | null = null;
 
-  private _innerElements: BlockSuite.EdgelessModel[] = [];
+  private _innerElements: GfxModel[] = [];
 
   private get _frameManager() {
     return this._edgelessService.frame;
@@ -117,7 +120,7 @@ export class EdgelessFrameManager {
   }
 
   constructor(private _rootService: EdgelessRootService) {
-    this._watchElementAddedOrDeleted();
+    this._watchElementAdded();
   }
 
   private _addFrameBlock(bound: Bound) {
@@ -145,12 +148,18 @@ export class EdgelessFrameManager {
     return frameModel;
   }
 
-  private _watchElementAddedOrDeleted() {
+  private _watchElementAdded() {
     this._disposable.add(
       this._rootService.surface.elementAdded.on(({ id, local }) => {
         const element = this._rootService.surface.getElementById(id);
         if (element && local) {
           const frame = this.getFrameFromPoint(element.elementBound.center);
+
+          // if the container created with a frame, skip it.
+          // |<-- Container |< -- frame -->| Container -->|
+          if (isGfxContainerElm(element) && frame && element.hasChild(frame)) {
+            return;
+          }
 
           // TODO(@L-Sun): refactor this in a tree manager
           if (element instanceof GroupElementModel) {
@@ -208,10 +217,7 @@ export class EdgelessFrameManager {
   /**
    * Reset parent of elements to the frame
    */
-  addElementsToFrame(
-    frame: FrameBlockModel,
-    elements: BlockSuite.EdgelessModel[]
-  ) {
+  addElementsToFrame(frame: FrameBlockModel, elements: GfxModel[]) {
     if (frame.childElementIds === undefined) {
       elements = [...elements, ...this.getChildElementsInFrame(frame)];
       frame.childElementIds = {};
@@ -223,25 +229,8 @@ export class EdgelessFrameManager {
 
     if (elements.length === 0) return;
 
-    this._rootService.doc.transact(() => {
-      elements.forEach(element => {
-        // TODO(@L-Sun): refactor this. This branch is avoid circle, but it's better to handle in a tree manager
-        if (isGfxContainerElm(element) && element.childIds.includes(frame.id)) {
-          if (isFrameBlock(element)) {
-            this.removeParentFrame(frame);
-          } else if (element instanceof GroupElementModel) {
-            // eslint-disable-next-line unicorn/prefer-dom-node-remove
-            element.removeChild(frame.id);
-          }
-        }
-
-        const parentFrame = this.getParentFrame(element);
-        if (parentFrame) {
-          // eslint-disable-next-line unicorn/prefer-dom-node-remove
-          parentFrame.removeChild(element);
-        }
-        frame.addChild(element);
-      });
+    elements.forEach(element => {
+      frame.addChild(element);
     });
   }
 
@@ -263,7 +252,7 @@ export class EdgelessFrameManager {
     return frameModel;
   }
 
-  createFrameOnElements(elements: BlockSuite.EdgelessModel[]) {
+  createFrameOnElements(elements: GfxModel[]) {
     let bound = edgelessElementsBound(
       this._rootService.selection.selectedElements
     );
@@ -318,7 +307,7 @@ export class EdgelessFrameManager {
    * 1. The frame doesn't have `childElements`, return all elements in the frame bound but not owned by another frame.
    * 2. Return all child elements of the frame if `childElements` exists.
    */
-  getChildElementsInFrame(frame: FrameBlockModel): BlockSuite.EdgelessModel[] {
+  getChildElementsInFrame(frame: FrameBlockModel): GfxModel[] {
     if (frame.childElementIds === undefined) {
       return this.getElementsInFrameBound(frame).filter(
         element => this.getParentFrame(element) !== null
@@ -338,7 +327,7 @@ export class EdgelessFrameManager {
    */
   getElementsInFrameBound(frame: FrameBlockModel, fullyContained = true) {
     const bound = Bound.deserialize(frame.xywh);
-    const elements: BlockSuite.EdgelessModel[] = this._rootService.gfx.grid
+    const elements: GfxModel[] = this._rootService.gfx.grid
       .search(bound, fullyContained)
       .filter(element => element !== frame);
 
@@ -358,10 +347,9 @@ export class EdgelessFrameManager {
     return null;
   }
 
-  getParentFrame(element: BlockSuite.EdgelessModel) {
-    return this.frames.find(frame => {
-      return frame.childIds.includes(element.id);
-    });
+  getParentFrame(element: GfxModel) {
+    const container = element.container;
+    return container && isFrameBlock(container) ? container : null;
   }
 
   removeAllChildrenFromFrame(frame: FrameBlockModel) {
@@ -370,7 +358,7 @@ export class EdgelessFrameManager {
     });
   }
 
-  removeParentFrame(element: BlockSuite.EdgelessModel) {
+  removeParentFrame(element: GfxModel) {
     const parentFrame = this.getParentFrame(element);
     if (parentFrame) {
       // eslint-disable-next-line unicorn/prefer-dom-node-remove

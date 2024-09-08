@@ -21,6 +21,10 @@ import type { GfxBlockElementModel, GfxModel } from '../gfx-block-model.js';
 import type { SurfaceBlockModel } from './surface-model.js';
 
 import {
+  getDescendantElementsImpl,
+  hasDescendantElementImpl,
+} from '../tree.js';
+import {
   convertProps,
   field,
   getDerivedProps,
@@ -94,7 +98,13 @@ export interface GfxContainerElement extends GfxCompatibleProps {
   [gfxContainerSymbol]: true;
   childIds: string[];
   childElements: GfxModel[];
-  hasDescendant(element: string | GfxModel): boolean;
+
+  addChild(element: GfxModel): void;
+  removeChild(element: GfxModel): void;
+  hasChild(element: GfxModel): boolean;
+
+  hasDescendantElement(element: GfxModel): boolean;
+  getDescendantElements(): GfxModel[];
 }
 
 export abstract class GfxPrimitiveElementModel<
@@ -132,6 +142,10 @@ export abstract class GfxPrimitiveElementModel<
 
   get connectable() {
     return true;
+  }
+
+  get container() {
+    return this.surface.getContainer(this.id);
   }
 
   get deserializedXYWH() {
@@ -466,6 +480,8 @@ export abstract class GfxGroupLikeElementModel<
     });
   }
 
+  abstract addChild(element: GfxModel): void;
+
   /**
    * @deprecated Use `getAllDescendantElements` instead.
    * Get all descendants of this group
@@ -485,33 +501,29 @@ export abstract class GfxGroupLikeElementModel<
     }, [] as GfxModel[]);
   }
 
+  getDescendantElements(): GfxModel[] {
+    return getDescendantElementsImpl(this);
+  }
+
   /**
    * The actual field that stores the children of the group.
    * It should be a ymap decorated with `@field`.
    */
-  hasChild(element: string | GfxModel) {
-    return (
-      (typeof element === 'string'
-        ? this.children?.has(element)
-        : this.children?.has(element.id)) ?? false
-    );
+  hasChild(element: GfxModel) {
+    return this.childElements.includes(element);
   }
 
   /**
    * Check if the group has the given descendant.
    */
-  hasDescendant(element: string | GfxModel) {
-    const groups = this.surface.getGroups(
-      typeof element === 'string' ? element : element.id
-    );
-
-    return groups.some(group => group.id === this.id);
+  hasDescendantElement(element: GfxModel): boolean {
+    return hasDescendantElementImpl(this, element);
   }
 
   /**
    * Remove the child from the group
    */
-  abstract removeChild(id: string): void;
+  abstract removeChild(element: GfxModel): void;
 
   /**
    * Set the new value of the childIds

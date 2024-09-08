@@ -1,5 +1,6 @@
 import { AIStarIcon } from '@blocksuite/affine-components/icons';
 import { type EditorHost, WithDisposable } from '@blocksuite/block-std';
+import { isGfxContainerElm } from '@blocksuite/block-std/gfx';
 import { css, html, LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
@@ -7,7 +8,7 @@ import type { AIItemGroupConfig } from '../../../_common/components/ai-item/type
 import type { EdgelessRootBlockComponent } from '../../edgeless/edgeless-root-block.js';
 import type { CopilotSelectionController } from '../../edgeless/tools/copilot-tool.js';
 
-import { getAllDescendantElements } from '../../edgeless/utils/tree.js';
+import { sortEdgelessElements } from '../../edgeless/utils/clone-utils.js';
 
 @customElement('edgeless-copilot-toolbar-entry')
 export class EdgelessCopilotToolbarEntry extends WithDisposable(LitElement) {
@@ -22,12 +23,23 @@ export class EdgelessCopilotToolbarEntry extends WithDisposable(LitElement) {
   `;
 
   private _showCopilotPanel() {
-    const selectedElements = this.edgeless.service.selection.selectedElements;
+    const treeManager = this.edgeless.surfaceBlockModel.tree;
+    const selectedElements = sortEdgelessElements(
+      this.edgeless.service.selection.selectedElements
+    );
     const toBeSelected = new Set(selectedElements);
+
     selectedElements.forEach(element => {
-      getAllDescendantElements(element).forEach(descendant => {
-        toBeSelected.add(descendant);
-      });
+      // its descendants are already selected
+      if (toBeSelected.has(element)) return;
+
+      toBeSelected.add(element);
+
+      if (isGfxContainerElm(element)) {
+        treeManager.getDescendantElements(element).forEach(descendant => {
+          toBeSelected.add(descendant);
+        });
+      }
     });
 
     this.edgeless.service.tool.setEdgelessTool({

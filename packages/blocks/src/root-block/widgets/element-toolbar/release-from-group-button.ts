@@ -11,13 +11,13 @@ export class EdgelessReleaseFromGroupButton extends WithDisposable(LitElement) {
   private _releaseFromGroup() {
     const service = this.edgeless.service;
     const element = service.selection.firstElement;
+    const treeManager = this.edgeless.surface.model.tree;
 
     if (!(element.group instanceof GroupElementModel)) return;
 
     const group = element.group;
 
-    // eslint-disable-next-line unicorn/prefer-dom-node-remove
-    group.removeChild(element);
+    treeManager.removeChildFromContainer(element);
 
     element.index = service.layer.generateIndex(
       'flavour' in element ? element.flavour : element.type
@@ -25,7 +25,7 @@ export class EdgelessReleaseFromGroupButton extends WithDisposable(LitElement) {
 
     const parent = group.group;
     if (parent instanceof GroupElementModel) {
-      parent.addChild(element.id);
+      treeManager.addChildToContainer(parent, element);
     }
   }
 

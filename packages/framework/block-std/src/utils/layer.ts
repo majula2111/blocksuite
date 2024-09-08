@@ -97,9 +97,14 @@ export function renderableInEdgeless(
  * @returns
  */
 export function compare(a: GfxModel, b: GfxModel) {
-  if (isGfxContainerElm(a) && a.hasDescendant(b)) {
+  const surface = a.surface ?? b.surface;
+  if (!surface) return SortOrder.SAME;
+
+  const { tree } = surface;
+
+  if (isGfxContainerElm(a) && tree.hasDescendantElement(a, b)) {
     return SortOrder.BEFORE;
-  } else if (isGfxContainerElm(b) && b.hasDescendant(a)) {
+  } else if (isGfxContainerElm(b) && tree.hasDescendantElement(b, a)) {
     return SortOrder.AFTER;
   } else {
     const aGroups = a.groups as GfxContainerElement[];

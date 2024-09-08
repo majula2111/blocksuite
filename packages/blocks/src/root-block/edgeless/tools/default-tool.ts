@@ -5,7 +5,6 @@ import type {
   NoteBlockModel,
 } from '@blocksuite/affine-model';
 import type { PointerEventState } from '@blocksuite/block-std';
-import type { PointTestOptions } from '@blocksuite/block-std/gfx';
 import type { IVec } from '@blocksuite/global/utils';
 
 import {
@@ -26,6 +25,10 @@ import {
   handleNativeRangeAtPoint,
   resetNativeSelection,
 } from '@blocksuite/affine-shared/utils';
+import {
+  isGfxContainerElm,
+  type PointTestOptions,
+} from '@blocksuite/block-std/gfx';
 import {
   Bound,
   DisposableGroup,
@@ -54,7 +57,6 @@ import {
   mountShapeTextEditor,
   mountTextElementEditor,
 } from '../utils/text.js';
-import { getAllDescendantElements, getTopElements } from '../utils/tree.js';
 import { EdgelessToolController } from './edgeless-tool.js';
 
 export enum DefaultModeDragType {
@@ -223,7 +225,10 @@ export class DefaultToolController extends EdgelessToolController<DefaultTool> {
     const h = Math.abs(startY - curY);
     const bound = new Bound(x, y, w, h);
 
-    const elements = getTopElements(service.gfx.getElementsByBound(bound));
+    const treeManager = this._surface.model.tree;
+    const elements = treeManager.getTopElements(
+      service.gfx.getElementsByBound(bound)
+    );
 
     const set = new Set(
       tools.shiftKey ? [...elements, ...selection.selectedElements] : elements
@@ -923,7 +928,8 @@ export class DefaultToolController extends EdgelessToolController<DefaultTool> {
 
     {
       const frameManager = this._service.frame;
-      const toBeMovedTopElements = getTopElements(this._toBeMoved);
+      const treeManager = this._surface.model.tree;
+      const toBeMovedTopElements = treeManager.getTopElements(this._toBeMoved);
       if (this._hoveredFrame) {
         frameManager.addElementsToFrame(
           this._hoveredFrame,
@@ -1021,17 +1027,18 @@ export class DefaultToolController extends EdgelessToolController<DefaultTool> {
 
     const elements = this.edgelessSelectionManager.selectedElements;
     const toBeMoved = new Set(elements);
+    const tree = this._surface.model.tree;
     elements.forEach(element => {
       if (element.group instanceof MindmapElementModel && elements.length > 1) {
-        getAllDescendantElements(element.group).forEach(ele =>
-          toBeMoved.add(ele)
-        );
-      } else {
-        getAllDescendantElements(element).forEach(ele => {
+        tree
+          .getDescendantElements(element.group)
+          .forEach(ele => toBeMoved.add(ele));
+      } else if (isGfxContainerElm(element)) {
+        tree.getDescendantElements(element).forEach(ele => {
           if (ele.group instanceof MindmapElementModel) {
-            getAllDescendantElements(ele.group).forEach(_el =>
-              toBeMoved.add(_el)
-            );
+            tree
+              .getDescendantElements(ele.group)
+              .forEach(_el => toBeMoved.add(_el));
           }
           toBeMoved.add(ele);
         });

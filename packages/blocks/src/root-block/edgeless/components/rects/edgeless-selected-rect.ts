@@ -83,7 +83,6 @@ import {
   isImageBlock,
   isNoteBlock,
 } from '../../utils/query.js';
-import { getTopElements } from '../../utils/tree.js';
 import '../auto-complete/edgeless-auto-complete.js';
 import '../connector/connector-handle.js';
 import { HandleDirection } from '../resize/resize-handles.js';
@@ -1081,6 +1080,7 @@ export class EdgelessSelectedRect extends WithDisposable(LitElement) {
 
   #adjustFrame(frame: FrameBlockModel, bound: Bound) {
     const frameManager = this.edgeless.service.frame;
+    const treeManager = this.surface.model.tree;
 
     const oldChildren = frameManager.getChildElementsInFrame(frame);
 
@@ -1088,13 +1088,13 @@ export class EdgelessSelectedRect extends WithDisposable(LitElement) {
       xywh: bound.serialize(),
     });
 
-    const newChildren = getTopElements(
-      frameManager.getElementsInFrameBound(frame)
-    ).concat(
-      oldChildren.filter(oldChild => {
-        return frame.intersectsBound(oldChild.elementBound);
-      })
-    );
+    const newChildren = treeManager
+      .getTopElements(frameManager.getElementsInFrameBound(frame))
+      .concat(
+        oldChildren.filter(oldChild => {
+          return frame.intersectsBound(oldChild.elementBound);
+        })
+      );
 
     frameManager.removeAllChildrenFromFrame(frame);
     frameManager.addElementsToFrame(frame, newChildren);
