@@ -33,6 +33,14 @@ export type JobConfig = {
   middlewares?: JobMiddleware[];
 };
 
+function nextTick(callback: () => void) {
+  if (typeof requestIdleCallback !== 'undefined') {
+    return Number(requestIdleCallback(callback));
+  } else {
+    return Number(setTimeout(callback, 0));
+  }
+}
+
 export class Job {
   private readonly _adapterConfigs = new Map<string, string>();
 
@@ -51,7 +59,7 @@ export class Job {
     afterExport: new Slot<FinalPayload>(),
   };
 
-  private _unblockTimer?: ReturnType<typeof setTimeout>;
+  private _unblockTimer?: number;
 
   blockToSnapshot = async (
     model: DraftModel
@@ -259,12 +267,12 @@ export class Job {
       SliceSnapshotSchema.parse(snapshot);
       const { content, pageVersion, workspaceVersion, workspaceId, pageId } =
         snapshot;
-      const contentBlocks: BlockModel[] = [];
-      for (const [i, block] of content.entries()) {
-        contentBlocks.push(
-          await this._batchSnapshotToBlock(block, doc, parent, (index ?? 0) + i)
-        );
-      }
+
+      const contentBlockPromises = content.map((block, i) =>
+        this._batchSnapshotToBlock(block, doc, parent, (index ?? 0) + i)
+      );
+      const contentBlocks = await Promise.all(contentBlockPromises);
+
       const slice = new Slice({
         content: contentBlocks.map(block => toDraftModel(block)),
         pageVersion,
@@ -333,41 +341,60 @@ export class Job {
     });
   }
 
-  private _batchSnapshotToBlock(
+  /**
+   * Task Execution Strategy:
+   * 1. Execute first 100 tasks immediately.
+   * 2. Queue subsequent tasks when batch limit (100) is reached.
+   * 3. Process queued tasks in batches of up to 100 every 10ms.
+   * 4. Continue processing until queue is empty.
+   *
+   * This approach balances responsiveness and system load,
+   * ensuring all tasks are processed without overwhelming resources.
+   */
+  private async _batchSnapshotToBlock(
     snapshot: BlockSnapshot,
     doc: Doc,
     parent?: string,
     index?: number
   ) {
     return new Promise<BlockModel>(resolve => {
-      if (this._batchCounter < 100) {
+      const batchLimit = 100;
+      if (this._batchCounter < batchLimit) {
+        // Execute immediately if within batch limit
         resolve(this._snapshotToBlock(snapshot, doc, parent, index));
       } else {
-        // This will block the caller function
-        // so that no further operations can be added to the queue.
-        // Example:
-        // for (const snapshot of snapshots) {
-        //   // Block here as it is waiting for the promise to resolve.
-        //   await job.snapshotToBlock(snapshot, doc, id);
-        // }
-        this._pendingOperations.push(() =>
-          resolve(this._snapshotToBlock(snapshot, doc, parent, index))
-        );
+        // Queue the operation if batch limit is reached
+        this._pendingOperations.push(() => {
+          resolve(this._snapshotToBlock(snapshot, doc, parent, index));
+        });
       }
       this._batchCounter++;
-      const unblock = () => {
-        // There should only be one operation in the queue
-        // as we should create new jobs for each events.
-        // However, we still need to loop through the list
-        // to avoid potential bugs.
-        while (this._pendingOperations.length > 0) {
-          this._pendingOperations.shift()?.();
-        }
-        this._unblockTimer = undefined;
-        this._batchCounter = 0;
-      };
-      clearTimeout(this._unblockTimer);
-      this._unblockTimer = setTimeout(unblock, 10);
+
+      if (!this._unblockTimer) {
+        const processQueue = () => {
+          const operationsToProcess = Math.min(
+            this._pendingOperations.length,
+            batchLimit
+          );
+          for (let i = 0; i < operationsToProcess; i++) {
+            this._pendingOperations.shift()?.();
+          }
+          // Decrease the batch counter, but ensure it doesn't go below 0
+          this._batchCounter = Math.max(
+            0,
+            this._batchCounter - operationsToProcess
+          );
+          this._unblockTimer = undefined;
+
+          // If there are still pending operations, set another timer
+          if (this._pendingOperations.length > 0) {
+            this._unblockTimer = nextTick(processQueue);
+          }
+        };
+
+        // Initialize the timer to process the queue
+        this._unblockTimer = nextTick(processQueue);
+      }
     });
   }
 
@@ -486,11 +513,6 @@ export class Job {
       children,
     });
 
-    const nextTick =
-      typeof window !== 'undefined'
-        ? window.requestAnimationFrame
-        : setImmediate;
-    await new Promise(resolve => nextTick(() => resolve(undefined)));
     doc.addBlock(
       modelData.flavour as BlockSuite.Flavour,
       { ...modelData.props, id: modelData.id },
@@ -498,9 +520,10 @@ export class Job {
       index
     );
 
-    for (const [index, child] of children.entries()) {
-      await this._batchSnapshotToBlock(child, doc, id, index);
-    }
+    const childPromises = children.map((child, childIndex) =>
+      this._batchSnapshotToBlock(child, doc, id, childIndex)
+    );
+    await Promise.all(childPromises);
 
     const model = doc.getBlockById(id);
     if (!model) {
