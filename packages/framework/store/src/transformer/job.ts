@@ -268,10 +268,13 @@ export class Job {
       const { content, pageVersion, workspaceVersion, workspaceId, pageId } =
         snapshot;
 
-      const contentBlockPromises = content.map((block, i) =>
-        this._batchSnapshotToBlock(block, doc, parent, (index ?? 0) + i)
-      );
-      const contentBlocks = await Promise.all(contentBlockPromises);
+      const contentBlocks: BlockModel[] = [];
+      for (const [i, block] of content.entries()) {
+        contentBlocks.push(
+          // No Promise.all due to race condition
+          await this._batchSnapshotToBlock(block, doc, parent, (index ?? 0) + i)
+        );
+      }
 
       const slice = new Slice({
         content: contentBlocks.map(block => toDraftModel(block)),
