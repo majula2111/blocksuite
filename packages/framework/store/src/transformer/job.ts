@@ -345,7 +345,7 @@ export class Job {
    * Task Execution Strategy:
    * 1. Execute first 100 tasks immediately.
    * 2. Queue subsequent tasks when batch limit (100) is reached.
-   * 3. Process queued tasks in batches of up to 100 every 10ms.
+   * 3. Process queued tasks in batches of up to 100 every tick.
    * 4. Continue processing until queue is empty.
    *
    * This approach balances responsiveness and system load,
