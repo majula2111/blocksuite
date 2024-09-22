@@ -271,7 +271,6 @@ export class Job {
       const contentBlocks: BlockModel[] = [];
       for (const [i, block] of content.entries()) {
         contentBlocks.push(
-          // No Promise.all due to race condition
           await this._batchSnapshotToBlock(block, doc, parent, (index ?? 0) + i)
         );
       }
@@ -523,10 +522,9 @@ export class Job {
       index
     );
 
-    const childPromises = children.map((child, childIndex) =>
-      this._batchSnapshotToBlock(child, doc, id, childIndex)
-    );
-    await Promise.all(childPromises);
+    for (const [childIndex, child] of children.entries()) {
+      await this._batchSnapshotToBlock(child, doc, id, childIndex);
+    }
 
     const model = doc.getBlockById(id);
     if (!model) {
