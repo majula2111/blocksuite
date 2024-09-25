@@ -87,13 +87,16 @@ const styles = css`
 
   .display-mode-button-group {
     display: none;
+    position: absolute;
+    right: 8px;
+    top: -6px;
+    padding-top: 8px;
+    padding-bottom: 8px;
     align-items: center;
     gap: 4px;
-    padding: 2px;
     font-size: 12px;
     font-weight: 500;
     line-height: 20px;
-    position: relative;
   }
 
   .card-preview:hover .display-mode-button-group {
@@ -293,7 +296,7 @@ export class OutlineNoteCard extends SignalWatcher(WithDisposable(LitElement)) {
         this._showPopper = display === 'show';
       },
       {
-        mainAxis: 8,
+        mainAxis: 0,
         crossAxis: -60,
       }
     );
@@ -325,9 +328,11 @@ export class OutlineNoteCard extends SignalWatcher(WithDisposable(LitElement)) {
           @dblclick=${this._dispatchFitViewEvent}
         >
         ${html`<div class=${cardHeaderClasses}>
-          ${this.invisible
-            ? html`<span class="card-header-icon">${HiddenIcon}</span>`
-            : html`<span class="card-number">${this.number}</span>`}
+          ${
+            this.invisible
+              ? html`<span class="card-header-icon">${HiddenIcon}</span>`
+              : html`<span class="card-number">${this.number}</span>`
+          }
           <span class="card-divider"></span>
           <div class="display-mode-button-group">
             <span class="display-mode-button-label">Show in</span>
@@ -346,6 +351,7 @@ export class OutlineNoteCard extends SignalWatcher(WithDisposable(LitElement)) {
                 ${SmallArrowDownIcon}
               </div>
             </edgeless-tool-icon-button>
+          </div>
           </div>
           <note-display-mode-panel
             .displayMode=${displayMode}

@@ -1,3 +1,5 @@
+import type { BlockSuiteFlags } from '@blocksuite/global/types';
+
 import { AffineSchemas, TestUtils } from '@blocksuite/blocks';
 import { assertExists } from '@blocksuite/global/utils';
 import {
@@ -69,6 +71,7 @@ export function createStarterDocCollection() {
       enable_edgeless_text: true,
       enable_color_picker: true,
       enable_mind_map_import: true,
+      enable_advanced_block_visibility: true,
       ...flags,
     },
     awarenessSources: [new BroadcastChannelAwarenessSource(id)],

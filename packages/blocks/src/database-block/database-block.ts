@@ -6,8 +6,11 @@ import { DragIndicator } from '@blocksuite/affine-components/drag-indicator';
 import { PeekViewProvider } from '@blocksuite/affine-components/peek';
 import { toast } from '@blocksuite/affine-components/toast';
 import { NOTE_SELECTOR } from '@blocksuite/affine-shared/consts';
+import { DocModeProvider } from '@blocksuite/affine-shared/services';
 import { RANGE_SYNC_EXCLUDE_ATTR } from '@blocksuite/block-std';
 import {
+  createRecordDetail,
+  createUniComponentFromWebComponent,
   DatabaseSelection,
   DataView,
   dataViewCommonStyle,
@@ -18,6 +21,7 @@ import {
   type DataViewWidgetProps,
   defineUniComponent,
   renderUniLit,
+  uniMap,
 } from '@blocksuite/data-view';
 import { widgetPresets } from '@blocksuite/data-view/widget-presets';
 import { Rect } from '@blocksuite/global/utils';
@@ -41,7 +45,10 @@ import {
 } from '../root-block/index.js';
 import { getDropResult } from '../root-block/widgets/drag-handle/utils.js';
 import { popSideDetail } from './components/layout.js';
+import { HostContextKey } from './context/host-context.js';
 import { DatabaseBlockDataSource } from './data-source.js';
+import { BlockRenderer } from './detail-panel/block-renderer.js';
+import { NoteRenderer } from './detail-panel/note-renderer.js';
 
 export class DatabaseBlockComponent extends CaptionedBlockComponent<
   DatabaseBlockModel,
@@ -278,10 +285,8 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<
 
   get dataSource(): DatabaseBlockDataSource {
     if (!this._dataSource) {
-      this._dataSource = new DatabaseBlockDataSource(this.host, {
-        pageId: this.host.doc.id,
-        blockId: this.model.id,
-      });
+      this._dataSource = new DatabaseBlockDataSource(this.model);
+      this._dataSource.contextSet(HostContextKey, this.host);
     }
     return this._dataSource;
   }
@@ -325,6 +330,9 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<
     if (!this.doc.awarenessStore.getFlag('enable_database_full_width')) {
       return;
     }
+    if (this.std.get(DocModeProvider).getEditorMode() === 'edgeless') {
+      return;
+    }
     this.disposables.add(
       autoUpdate(this.host, this, () => {
         const padding =
@@ -353,7 +361,27 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<
           onDrag: this.onDrag,
           std: this.std,
           detailPanelConfig: {
-            openDetailPanel: (target, template) => {
+            openDetailPanel: (target, data) => {
+              const template = createRecordDetail({
+                ...data,
+                detail: {
+                  header: uniMap(
+                    createUniComponentFromWebComponent(BlockRenderer),
+                    props => ({
+                      ...props,
+                      host: this.host,
+                    })
+                  ),
+                  note: uniMap(
+                    createUniComponentFromWebComponent(NoteRenderer),
+                    props => ({
+                      ...props,
+                      model: this.model,
+                      host: this.host,
+                    })
+                  ),
+                },
+              });
               if (peekViewService) {
                 return peekViewService.peek(target, template);
               } else {
