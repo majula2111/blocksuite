@@ -2,6 +2,7 @@ import type { ServiceIdentifier } from '@blocksuite/global/di';
 import type { BlockModel } from '@blocksuite/store';
 
 import {
+  assertType,
   Bound,
   DisposableGroup,
   type IBound,
@@ -76,6 +77,19 @@ export class GfxController extends LifeCycleWatcher {
     this._disposables.add(this.tool);
   }
 
+  deleteElement(element: GfxModel | BlockModel<object> | string): void {
+    element = typeof element === 'string' ? element : element.id;
+
+    assertType<string>(element);
+
+    if (this.surface?.hasElementById(element)) {
+      this.surface.removeElement(element);
+    } else {
+      const block = this.doc.getBlock(element)?.model;
+      block && this.doc.deleteBlock(block);
+    }
+  }
+
   /**
    * Get a block or element by its id.
    * Note that non-gfx block can also be queried in this method.
@@ -90,6 +104,7 @@ export class GfxController extends LifeCycleWatcher {
       this.surface?.getElementById(id) ?? this.doc.getBlock(id)?.model ?? null
     );
   }
+
   /**
    * Get elements on a specific point.
    * @param x
@@ -101,7 +116,6 @@ export class GfxController extends LifeCycleWatcher {
     y: number,
     options: { all: true } & PointTestOptions
   ): GfxModel[];
-
   getElementByPoint(
     x: number,
     y: number,
@@ -154,6 +168,7 @@ export class GfxController extends LifeCycleWatcher {
     bound: IBound | Bound,
     options?: { type: 'all' }
   ): GfxModel[];
+
   getElementsByBound(
     bound: IBound | Bound,
     options: { type: 'canvas' }

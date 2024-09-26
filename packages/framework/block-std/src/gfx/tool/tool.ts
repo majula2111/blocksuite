@@ -14,6 +14,14 @@ export abstract class BaseTool {
     return this.gfx.tool.currentTool$.peek() === this;
   }
 
+  get doc() {
+    return this.gfx.doc;
+  }
+
+  get std() {
+    return this.gfx.std;
+  }
+
   get toolName() {
     return (this.constructor as typeof BaseTool).toolName;
   }
