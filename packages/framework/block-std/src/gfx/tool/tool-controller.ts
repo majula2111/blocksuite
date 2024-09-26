@@ -1,7 +1,10 @@
 import { DisposableGroup, type IBound } from '@blocksuite/global/utils';
 import { Signal } from '@preact/signals-core';
 
-import type { UIEventStateContext } from '../../event/index.js';
+import type {
+  PointerEventState,
+  UIEventStateContext,
+} from '../../event/index.js';
 import type { BlockStdScope } from '../../scope/block-std-scope.js';
 import type { BaseTool } from './tool.js';
 
@@ -22,7 +25,7 @@ const supportedEvents = [
 export interface ToolEventTarget {
   addHook(
     evtName: (typeof supportedEvents)[number],
-    handler: (evtState: UIEventStateContext) => undefined | boolean
+    handler: (evtState: PointerEventState) => undefined | boolean
   ): () => void;
 }
 
@@ -73,22 +76,23 @@ export class ToolController {
   private _initializeEvents() {
     const hooks: Record<
       string,
-      ((evtState: UIEventStateContext) => undefined | boolean)[]
+      ((evtState: PointerEventState) => undefined | boolean)[]
     > = {};
     const invokeToolHandler = (
       evtName: SupportedEvents,
       ctx: UIEventStateContext
     ) => {
+      const evt = ctx.get('pointerState');
       const evtHooks = hooks[evtName];
       const stopHandler = evtHooks?.reduce((pre, hook) => {
-        return pre || hook(ctx) === false;
+        return pre || hook(evt) === false;
       }, false);
 
       if (stopHandler || !this.currentTool$.peek()) {
         return;
       }
 
-      this.currentTool$.peek()?.[evtName](ctx);
+      this.currentTool$.peek()?.[evtName](evt);
     };
 
     /**
@@ -100,7 +104,7 @@ export class ToolController {
      */
     const addHook = (
       evtName: (typeof supportedEvents)[number],
-      handler: (evtState: UIEventStateContext) => undefined | boolean
+      handler: (evtState: PointerEventState) => undefined | boolean
     ) => {
       hooks[evtName] = hooks[evtName] ?? [];
       hooks[evtName].push(handler);

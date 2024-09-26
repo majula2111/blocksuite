@@ -1,7 +1,7 @@
 import { type Container, createIdentifier } from '@blocksuite/global/di';
 import { BlockSuiteError, ErrorCode } from '@blocksuite/global/exceptions';
 
-import type { UIEventStateContext } from '../../event/base.js';
+import type { PointerEventState } from '../../event/index.js';
 import type { ExtensionType } from '../../extension/extension.js';
 
 import { type GfxController, GfxControllerIdentifier } from '../controller.js';
@@ -28,27 +28,27 @@ export abstract class BaseTool {
 
   addHook(
     evtName: SupportedEvents,
-    handler: (evtState: UIEventStateContext) => undefined | boolean
+    handler: (evtState: PointerEventState) => undefined | boolean
   ): void {
     this.gfx.tool[eventTarget].addHook(evtName, handler);
   }
 
-  click(_: UIEventStateContext): void {}
+  click(_: PointerEventState): void {}
 
-  contextMenu(_: UIEventStateContext): void {}
+  contextMenu(_: PointerEventState): void {}
 
   /**
    * Called when the tool is deactivated.
    */
   deactivate(): void {}
 
-  doubleClick(_: UIEventStateContext): void {}
+  doubleClick(_: PointerEventState): void {}
 
-  dragEnd(_: UIEventStateContext): void {}
+  dragEnd(_: PointerEventState): void {}
 
-  dragMove(_: UIEventStateContext): void {}
+  dragMove(_: PointerEventState): void {}
 
-  dragStart(_: UIEventStateContext): void {}
+  dragStart(_: PointerEventState): void {}
 
   /**
    * Called when the tool is registered.
@@ -60,15 +60,15 @@ export abstract class BaseTool {
    */
   onunload(): void {}
 
-  pointerDown(_: UIEventStateContext): void {}
+  pointerDown(_: PointerEventState): void {}
 
-  pointerMove(_: UIEventStateContext): void {}
+  pointerMove(_: PointerEventState): void {}
 
-  pointerOut(_: UIEventStateContext): void {}
+  pointerOut(_: PointerEventState): void {}
 
-  pointerUp(_: UIEventStateContext): void {}
+  pointerUp(_: PointerEventState): void {}
 
-  tripleClick(_: UIEventStateContext): void {}
+  tripleClick(_: PointerEventState): void {}
 }
 
 export const ToolIdentifier = createIdentifier<BaseTool>('GfxTool');
